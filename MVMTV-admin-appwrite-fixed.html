@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MVMTV Admin — Appwrite</title>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#101828}
+.top{background:#111827;color:#fff;padding:18px 20px;display:flex;justify-content:space-between;align-items:center}
+.brand{font-size:22px;font-weight:800}.brand span{color:#f72568}.top small{opacity:.8}
+.wrap{max-width:1000px;margin:30px auto;padding:0 16px}
+.card{background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:24px;margin-bottom:20px;box-shadow:0 4px 16px rgba(16,24,40,.05)}
+.login{max-width:460px;margin:50px auto}.login h1{margin-top:0}
+label{display:block;font-weight:700;margin:14px 0 7px}input,textarea,select{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:9px;font:inherit}
+textarea{min-height:140px}.btn{border:0;border-radius:9px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:16px}
+.primary{background:#f72568;color:#fff}.secondary{background:#eef2f6;color:#344054}.danger{background:#fee4e2;color:#b42318}
+.error{background:#fff1f3;color:#b42318;border:1px solid #fda4af;padding:12px;border-radius:9px;margin-top:14px;display:none}
+.ok{background:#ecfdf3;color:#027a48;border:1px solid #abefc6;padding:12px;border-radius:9px;margin-top:14px;display:none}
+.hidden{display:none}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.stat{padding:18px;border:1px solid #e4e7ec;border-radius:12px}.stat strong{font-size:30px;display:block}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.nav button{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:10px 14px;font-weight:700}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;gap:10px;flex-direction:column}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">M<span>VMTV</span> ADMIN</div>
+  <small>Mosogar's Voice Media TV</small>
+</header>
+
+<div class="wrap">
+  <section id="loginView" class="card login">
+    <h1>Admin Login</h1>
+    <p>Sign in to manage MVMTV content.</p>
+    <form id="loginForm">
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+    <div id="loginError" class="error"></div>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div>
+          <h1>Dashboard</h1>
+          <p id="who"></p>
+        </div>
+        <button id="logoutBtn" class="btn secondary">Sign out</button>
+      </div>
+    </div>
+
+    <div class="nav">
+      <button data-panel="dashboard">Dashboard</button>
+      <button data-panel="videos">Videos</button>
+      <button data-panel="photos">Photos</button>
+      <button data-panel="stories">Stories</button>
+    </div>
+
+    <section id="dashboard" class="panel">
+      <div class="grid">
+        <div class="stat"><strong id="videoCount">0</strong>Videos</div>
+        <div class="stat"><strong id="photoCount">0</strong>Photos</div>
+        <div class="stat"><strong id="storyCount">0</strong>Stories</div>
+      </div>
+    </section>
+
+    <section id="videos" class="panel hidden">
+      <div class="card">
+        <h2>Add Video</h2>
+        <form id="videoForm">
+          <label>Title</label><input id="videoTitle" required>
+          <label>YouTube URL</label><input id="videoUrl" type="url" required>
+          <label>Description</label><textarea id="videoDesc"></textarea>
+          <button class="btn primary">Add Video</button>
+        </form>
+        <div id="videoMsg" class="ok"></div>
+        <div id="videoErr" class="error"></div>
+      </div>
+      <div class="card"><h2>Videos</h2><div id="videoList">Loading...</div></div>
+    </section>
+
+    <section id="photos" class="panel hidden">
+      <div class="card">
+        <h2>Add Photo Record</h2>
+        <p>For now, enter the public image URL. We will add Appwrite Storage upload next.</p>
+        <form id="photoForm">
+          <label>Title</label><input id="photoTitle" required>
+          <label>Photo URL</label><input id="photoUrl" type="url" required>
+          <label>Description</label><textarea id="photoDesc"></textarea>
+          <button class="btn primary">Add Photo</button>
+        </form>
+        <div id="photoMsg" class="ok"></div>
+        <div id="photoErr" class="error"></div>
+      </div>
+      <div class="card"><h2>Photos</h2><div id="photoList">Loading...</div></div>
+    </section>
+
+    <section id="stories" class="panel hidden">
+      <div class="card">
+        <h2>Stories</h2>
+        <p id="storyStatus">The Stories table ID still needs to be entered in this file before Stories can be connected.</p>
+      </div>
+    </section>
+  </section>
+</div>
+
+<script>
+const CONFIG={
+  endpoint:'https://fra.cloud.appwrite.io/v1',
+  projectId:'6ac7d11c00388e749374',
+  databaseId:'6ac7d37d0012c1a7e50b',
+  videosTableId:'6ac7db3500113599ead0',
+  photosTableId:'photos'
+};
+
+const client=new Appwrite.Client();
+client.setEndpoint(CONFIG.endpoint).setProject(CONFIG.projectId);
+const account=new Appwrite.Account(client);
+const tablesDB=new Appwrite.TablesDB(client);
+
+const $=id=>document.getElementById(id);
+function showError(id,msg){$(id).textContent=msg;$(id).style.display='block'}
+function showOk(id,msg){$(id).textContent=msg;$(id).style.display='block'}
+function hide(id){$(id).style.display='none'}
+
+async function checkSession(){
+  try{
+    const user=await account.get();
+    $('loginView').classList.add('hidden');
+    $('appView').classList.remove('hidden');
+    $('who').textContent='Signed in as '+(user.email||user.name||'MVMTV Admin');
+    await loadAll();
+  }catch(e){}
+}
+
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault(); hide('loginError');
+  const email=$('email').value.trim(), password=$('password').value;
+  try{
+    await account.createEmailPasswordSession({email,password});
+    await checkSession();
+  }catch(err){
+    showError('loginError',err?.message||'Login failed. Check the email and password.');
+  }
+});
+
+$('logoutBtn').addEventListener('click',async()=>{
+  try{await account.deleteSession('current')}catch(e){}
+  location.reload();
+});
+
+document.querySelectorAll('.nav button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+    $(btn.dataset.panel).classList.remove('hidden');
+  });
+});
+
+async function listRows(tableId){
+  return await tablesDB.listRows({databaseId:CONFIG.databaseId,tableId});
+}
+
+async function loadAll(){
+  try{
+    const v=await listRows(CONFIG.videosTableId);
+    $('videoCount').textContent=v.total;
+    $('videoList').innerHTML=v.rows.length?v.rows.map(r=>`<div style="padding:12px 0;border-bottom:1px solid #eee"><b>${esc(r.Title)}</b><br><small>${esc(r.YouTubeURL||'')}</small></div>`).join(''):'No videos yet.';
+  }catch(e){$('videoList').textContent='Could not load videos: '+(e.message||'Check table permissions.')}
+  try{
+    const p=await listRows(CONFIG.photosTableId);
+    $('photoCount').textContent=p.total;
+    $('photoList').innerHTML=p.rows.length?p.rows.map(r=>`<div style="padding:12px 0;border-bottom:1px solid #eee"><b>${esc(r.Title)}</b><br><small>${esc(r.PhotoURL||'')}</small></div>`).join(''):'No photos yet.';
+  }catch(e){$('photoList').textContent='Could not load photos: '+(e.message||'Check table permissions.')}
+}
+
+$('videoForm').addEventListener('submit',async e=>{
+  e.preventDefault();hide('videoErr');hide('videoMsg');
+  try{
+    await tablesDB.createRow({databaseId:CONFIG.databaseId,tableId:CONFIG.videosTableId,rowId:Appwrite.ID.unique(),data:{
+      Title:$('videoTitle').value.trim(),YouTubeURL:$('videoUrl').value.trim(),Description:$('videoDesc').value.trim(),Status:'draft'
+    }});
+    e.target.reset();showOk('videoMsg','Video saved successfully.');await loadAll();
+  }catch(err){showError('videoErr',err?.message||'Could not save video. Check table permissions.')}
+});
+
+$('photoForm').addEventListener('submit',async e=>{
+  e.preventDefault();hide('photoErr');hide('photoMsg');
+  try{
+    await tablesDB.createRow({databaseId:CONFIG.databaseId,tableId:CONFIG.photosTableId,rowId:Appwrite.ID.unique(),data:{
+      Title:$('photoTitle').value.trim(),PhotoURL:$('photoUrl').value.trim(),Description:$('photoDesc').value.trim(),Status:'draft'
+    }});
+    e.target.reset();showOk('photoMsg','Photo record saved successfully.');await loadAll();
+  }catch(err){showError('photoErr',err?.message||'Could not save photo. Check table permissions.')}
+});
+
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+checkSession();
+</script>
+</body>
+</html>
