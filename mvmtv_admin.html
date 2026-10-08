@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>MVMTV Admin</title>
+<style>
+body{font-family:Arial;margin:0;background:#f3f4f6;color:#17202a}header{background:#111820;color:white;padding:18px}main{max-width:760px;margin:auto;padding:15px}.card{background:white;padding:18px;margin:14px 0;border-radius:12px;box-shadow:0 2px 10px #0001}input,textarea,select{width:100%;padding:11px;margin:6px 0 12px;box-sizing:border-box;border:1px solid #ccc;border-radius:8px}button{padding:12px 16px;border:0;border-radius:8px;font-weight:bold;margin:4px;background:#d62828;color:white}.secondary{background:#555}.item{border-top:1px solid #ddd;padding:10px 0}.status{background:#eef2f5;padding:10px;border-radius:8px;margin-top:12px}.hidden{display:none}</style></head>
+<body><header><b>📺 MVMTV ADMIN</b><br><small>Mosogar's Voice Media TV</small></header>
+<main>
+<div class="card" id="login"><h2>🔐 Administrator Login</h2>
+<p>Enter your GitHub details. The token is used only in this browser session and is not saved by this page.</p>
+<label>GitHub username</label><input id="user" value="mosogarvoices001">
+<label>Repository</label><input id="repo" value="MVMTV-">
+<label>GitHub Personal Access Token</label><input id="token" type="password" placeholder="Paste token">
+<button onclick="connect()">Connect</button><div id="loginStatus" class="status"></div></div>
+
+<div class="card hidden" id="dash">
+<h2>📰 Publish News</h2><input id="headline" placeholder="Headline"><select id="category"><option>Mosogar News</option><option>Delta State</option><option>Nigeria</option><option>Interviews</option><option>Entertainment</option><option>Events</option></select><textarea id="story" placeholder="News story"></textarea><input id="image" placeholder="Featured image URL (optional)"><button onclick="news()">Add News</button>
+<h2>🎥 YouTube Video</h2><input id="vtitle" placeholder="Video title"><input id="vurl" placeholder="YouTube URL"><button onclick="video()">Add Video</button>
+<h2>📅 Event</h2><input id="ename" placeholder="Event name"><input id="edate" type="date"><input id="eloc" placeholder="Location"><button onclick="eventAdd()">Add Event</button>
+<h2>📢 Advertisement</h2><input id="aname" placeholder="Advertiser"><textarea id="atext" placeholder="Advertisement text"></textarea><input id="acontact" placeholder="Contact/WhatsApp"><button onclick="ad()">Add Advertisement</button>
+<h2>📋 Content</h2><div id="list"></div><button onclick="publish()">🚀 Publish to MVMTV</button><button class="secondary" onclick="backup()">Download Backup</button><div id="status" class="status"></div>
+</div></main>
+<script>
+let C,D={news:[],videos:[],events:[],ads:[]};
+const $=id=>document.getElementById(id);
+function say(x){$('status').textContent=x}
+async function connect(){C={u:$('user').value,r:$('repo').value,t:$('token').value};if(!C.t)return $('loginStatus').textContent='Paste your GitHub token first.';let r=await fetch(`https://api.github.com/repos/${C.u}/${C.r}/contents/content.json`,{headers:{Authorization:'Bearer '+C.t}});if(r.ok){let j=await r.json();D=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,'')))));D.sha=j.sha;$('loginStatus').textContent='Connected and content loaded.'}else if(r.status===404)$('loginStatus').textContent='Connected. New content file will be created.';else return $('loginStatus').textContent='GitHub connection failed.';$('dash').classList.remove('hidden');render()}
+function news(){if(!$('headline').value||!$('story').value)return say('Add headline and story.');D.news.push({headline:$('headline').value,category:$('category').value,story:$('story').value,image:$('image').value,date:new Date().toISOString()});$('headline').value=$('story').value=$('image').value='';render()}
+function video(){D.videos.push({title:$('vtitle').value,url:$('vurl').value});$('vtitle').value=$('vurl').value='';render()}
+function eventAdd(){D.events.push({name:$('ename').value,date:$('edate').value,location:$('eloc').value});$('ename').value=$('edate').value=$('eloc').value='';render()}
+function ad(){D.ads.push({name:$('aname').value,text:$('atext').value,contact:$('acontact').value});$('aname').value=$('atext').value=$('acontact').value='';render()}
+function render(){let a=[['News','news'],['Videos','videos'],['Events','events'],['Ads','ads']];$('list').innerHTML=a.map(g=>`<div class=item><b>${g[0]} (${D[g[1]].length})</b>${D[g[1]].map((x,i)=>`<div>${x.headline||x.title||x.name} <button onclick="D['${g[1]}'].splice(${i},1);render()">Delete</button></div>`).join('')}</div>`).join('')}
+async function publish(){let clean={news:D.news,videos:D.videos,events:D.events,ads:D.ads},body={message:'Update MVMTV content',content:btoa(unescape(encodeURIComponent(JSON.stringify(clean,null,2))))};if(D.sha)body.sha=D.sha;let r=await fetch(`https://api.github.com/repos/${C.u}/${C.r}/contents/content.json`,{method:'PUT',headers:{Authorization:'Bearer '+C.t,'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)return say('Publish failed. Check your token permissions.');let j=await r.json();D.sha=j.content.sha;say('✅ Published to GitHub. The website will update after Pages deployment.')}
+function backup(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));a.download='mvmtv-content.json';a.click()}
+</script></body></html>
